@@ -25,6 +25,8 @@ function ClientBuilder (manifest, GatewayClassFactory, configs) {
   this.GatewayClassFactory = GatewayClassFactory
 }
 
+const getMiddlewareName = middleware => middleware.__middlewareName
+
 ClientBuilder.prototype = {
   build () {
     const client = { _manifest: this.manifest }
@@ -50,11 +52,84 @@ ClientBuilder.prototype = {
     const GatewayClass = this.GatewayClassFactory()
     const gatewayConfigs = this.manifest.gatewayConfigs
     const chainRequestPhase = (requestPromise, middleware) => {
+      const start = new Date()
       return requestPromise
         .then(request => middleware.request(request))
         .then(request => this.Promise.resolve(request))
+        .then(request => {
+          const end = new Date()
+          const duration = end.getTime() - start.getTime()
+
+          if (request && request.enhance) {
+            return request.enhance({
+              _timeline: [
+                ...(request.timeline() || []),
+                {
+                  phase: 'request',
+                  name: getMiddlewareName(middleware),
+                  duration,
+                  invokedAt: start.toISOString(),
+                  completedAt: end.toISOString()
+                }
+              ]
+            })
+          }
+
+          return request
+        })
     }
-    const chainResponsePhase = (next, middleware) => () => middleware.response(next)
+    const chainResponsePhase = (next, middleware) => () => {
+      const start = new Date()
+      return middleware.response(next).then(response => {
+        const end = new Date()
+        const duration = end.getTime() - start.getTime()
+        const timelineEntry = [
+          ...(response ? response._timeline || [] : []),
+          {
+            phase: 'response',
+            name: getMiddlewareName(middleware),
+            status: 'success',
+            duration,
+            invokedAt: start.toISOString(),
+            completedAt: end.toISOString()
+          }
+        ]
+
+        if (response && response.enhance) {
+          return response.enhance({ _timeline: timelineEntry })
+        }
+
+        if (typeof response === 'object') {
+          response._timeline = timelineEntry
+        }
+
+        return response
+      }).catch(response => {
+        const end = new Date()
+        const duration = end.getTime() - start.getTime()
+        const timelineEntry = [
+          ...(response ? response._timeline || [] : []),
+          {
+            phase: 'response',
+            name: getMiddlewareName(middleware),
+            status: 'failure',
+            duration,
+            invokedAt: start.toISOString(),
+            completedAt: end.toISOString()
+          }
+        ]
+
+        if (response && response.enhance) {
+          throw response.enhance({ _timeline: timelineEntry })
+        }
+
+        if (typeof response === 'object') {
+          response._timeline = timelineEntry
+        }
+
+        throw response
+      })
+    }
 
     return new this.Promise((resolve, reject) => {
       return middleware
@@ -63,7 +138,58 @@ ClientBuilder.prototype = {
           this.Promise.resolve(initialRequest)
         )
         .then(finalRequest => {
-          const callGateway = () => new GatewayClass(finalRequest, gatewayConfigs).call()
+          const callGateway = () => {
+            const start = new Date()
+            return new GatewayClass(finalRequest, gatewayConfigs).call().then(response => {
+              const end = new Date()
+              const duration = end.getTime() - start.getTime()
+              const timelineEntry = [
+                ...(response ? response._timeline || [] : []),
+                {
+                  phase: 'gateway',
+                  name: 'HTTP request',
+                  status: 'success',
+                  duration,
+                  invokedAt: start.toISOString(),
+                  completedAt: end.toISOString()
+                }
+              ]
+
+              if (response && response.enhance) {
+                return response.enhance({ _timeline: timelineEntry })
+              }
+
+              if (typeof response === 'object') {
+                response._timeline = timelineEntry
+              }
+
+              return response
+            }).catch(response => {
+              const end = new Date()
+              const duration = end.getTime() - start.getTime()
+              const timelineEntry = [
+                ...(response ? response._timeline || [] : []),
+                {
+                  phase: 'gateway',
+                  name: 'HTTP request',
+                  status: 'failure',
+                  duration,
+                  invokedAt: start.toISOString(),
+                  completedAt: end.toISOString()
+                }
+              ]
+
+              if (response && response.enhance) {
+                throw response.enhance({ _timeline: timelineEntry })
+              }
+
+              if (typeof response === 'object') {
+                response._timeline = timelineEntry
+              }
+
+              throw response
+            })
+          }
           const execute = middleware.reduce(chainResponsePhase, callGateway)
 
           return execute().then(response => resolve(response))

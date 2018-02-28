@@ -7,7 +7,7 @@ import { lowerCaseObjectKeys, assign } from './utils'
  * @param {String} responseData, defaults to null
  * @param {Object} responseHeaders, defaults to an empty object ({})
  */
-function Response (originalRequest, responseStatus, responseData, responseHeaders) {
+function Response (originalRequest, responseStatus, responseData, responseHeaders, _timeline) {
   if (originalRequest.requestParams && originalRequest.requestParams.auth) {
     const maskedAuth = assign({}, originalRequest.requestParams.auth, { password: '***' })
     this.originalRequest = originalRequest.enhance({ auth: maskedAuth })
@@ -19,6 +19,13 @@ function Response (originalRequest, responseStatus, responseData, responseHeader
   this.responseData = responseData !== undefined ? responseData : null
   this.responseHeaders = responseHeaders || {}
   this.timeElapsed = null
+
+  const completeTimeline = [...(this._timeline || []), ...(_timeline || [])]
+  const gatewayEntry = completeTimeline.find(entry => entry.phase === 'gateway')
+  const responseTimeline = completeTimeline.filter(entry => entry.phase === 'response')
+  const requestTimeline = this.originalRequest.timeline ? this.originalRequest.timeline() || [] : []
+
+  this._timeline = [...requestTimeline, gatewayEntry, ...responseTimeline].filter(entry => entry)
 }
 
 Response.prototype = {
@@ -114,7 +121,8 @@ Response.prototype = {
       this.request(),
       extras.status || this.status(),
       extras.rawData || this.rawData(),
-      assign({}, this.headers(), extras.headers)
+      assign({}, this.headers(), extras.headers),
+      extras._timeline
     )
   }
 }

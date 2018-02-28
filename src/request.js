@@ -13,6 +13,10 @@ function Request (methodDescriptor, requestParams) {
 }
 
 Request.prototype = {
+  timeline () {
+    return this.requestParams._timeline
+  },
+
   /**
    * @return {Object}
    */
@@ -27,7 +31,8 @@ Request.prototype = {
       key !== this.methodDescriptor.headersAttr &&
         key !== this.methodDescriptor.bodyAttr &&
         key !== this.methodDescriptor.authAttr &&
-        key !== this.methodDescriptor.timeoutAttr
+        key !== this.methodDescriptor.timeoutAttr &&
+        key !== '_timeline'
     )
 
     return Object
@@ -162,6 +167,7 @@ Request.prototype = {
     extras.auth && (requestParams[authKey] = extras.auth)
     extras.timeout && (requestParams[timeoutKey] = extras.timeout)
 
+    requestParams._timeline = extras._timeline || []
     return new Request(this.methodDescriptor, requestParams)
   },
 
