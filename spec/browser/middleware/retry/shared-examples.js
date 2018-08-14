@@ -20,6 +20,8 @@ export function retryMiddlewareExamples (middleware, retries, headerRetryCount, 
         const request = newRequest(methodName)
         const response = newResponse(middleware.request(request))
 
+        expect(1).toEqual(0)
+
         middleware
           .response(() => Promise.resolve(response))
           .then(response => {
