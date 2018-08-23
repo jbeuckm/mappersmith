@@ -5,13 +5,15 @@ describe('Middleware / RetryMiddleware', () => {
   const retries = 3
   const headerRetryCount = 'X-Mappersmith-Retry-Count'
   const headerRetryTime = 'X-Mappersmith-Retry-Time'
-  const middleware = RetryMiddleware({ retries, headerRetryCount, headerRetryTime })()
+  const createMiddleware = (retries, headerRetryCount, headerRetryTime) =>
+    RetryMiddleware({ retries, headerRetryCount, headerRetryTime })()
+  const middleware = createMiddleware(retries, headerRetryCount, headerRetryTime)
 
   it('exposes name', () => {
     expect(RetryMiddleware({}).name).toEqual('RetryMiddleware')
   })
 
-  it('should behave like retry examples', () => {
+  describe('should behave like retry examples', () => {
     retryMiddlewareExamples(middleware, retries, headerRetryCount, headerRetryTime)
   })
 })

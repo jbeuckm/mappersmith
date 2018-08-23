@@ -17,9 +17,10 @@ let retryConfigs = assign({}, defaultRetryConfigs)
  *   @param {Number} newConfigs.multiplier (default: 2) - exponential factor
  *   @param {Number} newConfigs.retries (default: 5) - max retries
  */
-export const setRetryConfigs = (newConfigs) => {
+export const setRetryConfigs = newConfigs => {
   console.warn('The use of setRetryConfigs is deprecated - use RetryMiddleware v2 instead.')
   retryConfigs = assign({}, retryConfigs, newConfigs)
+  console.log({ retryConfigs })
 }
 
 /**
@@ -48,13 +49,13 @@ export default RetryMiddleware
  *
  * @return {Number}
  */
-export const calculateExponentialRetryTime = (retryTime) =>
+export const calculateExponentialRetryTime = retryTime =>
   Math.min(
     randomFromRetryTime(retryTime) * retryConfigs.multiplier,
     retryConfigs.maxRetryTimeInSecs * 1000
   )
 
-const randomFromRetryTime = (retryTime) => {
+const randomFromRetryTime = retryTime => {
   const delta = retryConfigs.factor * retryTime
   return random(retryTime - delta, retryTime + delta)
 }
